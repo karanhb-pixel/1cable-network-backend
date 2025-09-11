@@ -9,7 +9,7 @@ require_once(ABSPATH . 'wp-admin/includes/user.php');
  */
 add_action('rest_api_init',function(){
 
-    register_rest_route(route_namespace: 'wp/v2', route: 'delete-user/(?P<id>\d+)', args: [
+    register_rest_route(route_namespace: 'wp/v2/iws/v1', route: 'delete-user/(?P<id>\d+)', args: [
         'methods' => 'DELETE',
         'callback' => 'iws_delete_user_callback',
         'permission_callback' => 'iws_delete_user_permissions_check',
@@ -73,7 +73,7 @@ function iws_delete_user_callback($request)
     }
     $delete_user_result = [];
     if(function_exists(function: 'wp_delete_user')){
-        error_log(message: print_r(value: "wp_delete_user function exist."),message_type: true);
+        // error_log(message: print_r(value: "wp_delete_user function exist."),message_type: true);
         $delete_user_result = wp_delete_user(id: $user_id);
     }
     

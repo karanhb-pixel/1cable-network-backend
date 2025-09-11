@@ -1,6 +1,6 @@
 <?php
 // Register edit-user endpoint
-register_rest_route('wp/v2', 'edit-user/(?P<id>\d+)', [
+register_rest_route('wp/v2/iws/v1', 'edit-user/(?P<id>\d+)', [
     'methods' => 'PUT',
     'callback' => 'handle_edit_user',
     'permission_callback' => 'check_edit_user_permission',

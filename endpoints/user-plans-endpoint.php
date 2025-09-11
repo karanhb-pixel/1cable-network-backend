@@ -1,6 +1,6 @@
 <?php
 // Register user-plans endpoint
-register_rest_route('wp/v2', 'user-plans', [
+register_rest_route('wp/v2/iws/v1', 'users', [
     'methods' => 'GET',
     'callback' => 'get_user_plans',
     'permission_callback' => 'check_user_permission'

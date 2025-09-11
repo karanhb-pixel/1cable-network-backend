@@ -1,6 +1,6 @@
 <?php
 // Register add-user endpoint
-register_rest_route('wp/v2', 'add-user', [
+register_rest_route('wp/v2/iws/v1', 'add-user', [
     'methods' => 'POST',
     'callback' => 'handle_add_user',
     'permission_callback' => 'check_create_user_permission',
