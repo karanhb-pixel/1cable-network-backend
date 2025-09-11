@@ -6,4 +6,5 @@ add_action('rest_api_init', function() {
     require_once IWS_CUSTOM_CODE_PATH . 'endpoints/add-user-endpoint.php';
     require_once IWS_CUSTOM_CODE_PATH . 'endpoints/get-wifi-plans-endpoint.php';
     require_once IWS_CUSTOM_CODE_PATH . 'endpoints/get-ott-plans-endpoint.php';
+    // require_once IWS_CUSTOM_CODE_PATH . 'endpoints/delete-user-endpoint.php';
 });

@@ -26,3 +26,7 @@ require_once IWS_CUSTOM_CODE_PATH . 'includes/jwt-modifications.php';
 
 // Include common functions file
 require_once IWS_CUSTOM_CODE_PATH . 'includes/common-functions.php';
+
+
+// Include the delete user endpoint file
+require_once IWS_CUSTOM_CODE_PATH . 'endpoints/delete-user-endpoint.php';
