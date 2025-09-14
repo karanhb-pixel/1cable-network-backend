@@ -1,6 +1,6 @@
 <?php
 // Register add-user endpoint
-register_rest_route('wp/v2/iws/v1', 'add-user', [
+register_rest_route('wp/v2/iws/v1', 'users', [
     'methods' => 'POST',
     'callback' => 'handle_add_user',
     'permission_callback' => 'check_create_user_permission',
@@ -37,8 +37,8 @@ register_rest_route('wp/v2/iws/v1', 'add-user', [
                 'sanitize_callback' => 'sanitize_email',
                 'validate_callback' => 'is_email',
             ],
-            'nickname' => [
-                'description' => 'The nickname for the user.',
+            'nicename' => [
+                'description' => 'The nicename for the user.',
                 'type' => 'string',
                 'required' => false,
                 'sanitize_callback' => 'sanitize_text_field',
@@ -108,7 +108,7 @@ function handle_add_user($request) {
     $first_name  = isset($params['first_name'])  ? $params['first_name']  : '';
     $last_name   = isset($params['last_name'])   ? $params['last_name']   : '';
     $email       = isset($params['email'])       ? $params['email']       : '';
-    $nickname    = isset($params['nickname'])    ? $params['nickname']    : '';
+    $nicename    = isset($params['nicename'])    ? $params['nicename']    : '';
     $roles       = isset($params['roles'])       ? $params['roles']       : '';
     $password    = isset($params['password'])    ? $params['password']    : '';
     $wifi_plan 	= (empty($params['wifi_plan']) || trim($params['wifi_plan']) === '0') ? 0 : $params['wifi_plan'];
@@ -118,7 +118,7 @@ function handle_add_user($request) {
 
 
      // Create the user
-    $user_id = wp_insert_user( array(
+    $user_id = wp_insert_user( userdata: [
         'user_login'    => $username,
         'user_pass'     => $password,
         'user_email'    => $email,
@@ -126,8 +126,8 @@ function handle_add_user($request) {
         'display_name'  => $name,
         'first_name'    => $first_name,
         'last_name'     => $last_name,
-        'nickname'      => $nickname,
-    ) );
+        'nicename'      => $nicename,
+    ] );
 
     if (is_wp_error($user_id)) {
         return new WP_REST_Response(['error' => $user_id->get_error_message()], 400);

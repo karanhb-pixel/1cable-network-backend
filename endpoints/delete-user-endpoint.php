@@ -9,7 +9,7 @@ require_once(ABSPATH . 'wp-admin/includes/user.php');
  */
 add_action('rest_api_init',function(){
 
-    register_rest_route(route_namespace: 'wp/v2/iws/v1', route: 'delete-user/(?P<id>\d+)', args: [
+    register_rest_route(route_namespace: 'wp/v2/iws/v1', route: 'users/(?P<id>\d+)', args: [
         'methods' => 'DELETE',
         'callback' => 'iws_delete_user_callback',
         'permission_callback' => 'iws_delete_user_permissions_check',
