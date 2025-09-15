@@ -1,15 +1,23 @@
 <?php
 // Register edit-user endpoint
-register_rest_route('wp/v2/iws/v1', 'users/(?P<id>\d+)', [
+register_rest_route('wp/v2/iws/v1', 'users', [
     'methods' => 'PUT',
     'callback' => 'handle_edit_user',
     'permission_callback' => 'check_edit_user_permission',
     'args' => [
-        'id' => [
-            'description' => 'User ID to edit.',
+        'plan_id' => [
+            'description' => 'Plan ID to filter results.',
             'type' => 'integer',
-            'required' => true,
-            'validate_callback' => function($value) {
+            'required' => false,
+            'validate_callback' => function ($value) {
+                return is_numeric($value) && $value > 0;
+            },
+        ],
+        'user_id' => [
+            'description' => 'User ID to filter results.',
+            'type' => 'integer',
+            'required' => false,
+            'validate_callback' => function ($value) {
                 return is_numeric($value) && $value > 0;
             },
         ],
@@ -45,8 +53,8 @@ register_rest_route('wp/v2/iws/v1', 'users/(?P<id>\d+)', [
             'sanitize_callback' => 'sanitize_email',
             'validate_callback' => 'is_email',
         ],
-        'nickname' => [
-            'description' => 'The nickname for the user.',
+        'nicename' => [
+            'description' => 'The nicename for the user.',
             'type' => 'string',
             'required' => false,
             'sanitize_callback' => 'sanitize_text_field',
@@ -108,10 +116,12 @@ function check_edit_user_permission() {
 // Callback function
 function handle_edit_user($request) {
     $params = $request->get_json_params();
-    $user_id = (int) $request->get_url_params()['id'];
+    $plan_id = $request->get_param('plan_id');
+    $user_id = isset($params['user_id']) ? sanitize_user($params['user_id']) : '';
     global $wpdb;
     $table_name = 'user_plans';
 
+    // error_log('handle_edit_user called with user_id: ' . $plan_id . ' and user_login: ' . $user_id);
     // Validate user exists
     $user = get_user_by('ID', $user_id);
     if (!$user) {
@@ -135,8 +145,8 @@ function handle_edit_user($request) {
     if (isset($params['email']) && !empty($params['email'])) {
         $user_update_data['user_email'] = $params['email'];
     }
-    if (isset($params['nickname'])) {
-        $user_update_data['nickname'] = $params['nickname'];
+    if (isset($params['nicename'])) {
+        $user_update_data['nicename'] = $params['nicename'];
     }
     if (isset($params['roles']) && !empty($params['roles'])) {
         $user_update_data['role'] = $params['roles'];
@@ -144,8 +154,9 @@ function handle_edit_user($request) {
     if (isset($params['password']) && !empty($params['password'])) {
         $user_update_data['user_pass'] = $params['password'];
     }
-    $user_update_data['ID'] = $user_id;
+    $user_update_data['ID'] = $user->ID;
 
+    // error_log('uesr_update_data in edit user enddpoint'. print_r($user_update_data, true));
     // Update the user
     if (!empty($user_update_data)) {
         $update_result = wp_update_user($user_update_data);
@@ -184,8 +195,8 @@ function handle_edit_user($request) {
 
     // Update user_plans table
     if (!empty($plan_update_data)) {
-        $where = ['email' => $user->user_email]; // Assuming username is unique identifier in user_plans
-        $update_result = $wpdb->update($table_name, $plan_update_data, $where, $plan_update_formats, ['%s']);
+        $where = ['plan_id' => $plan_id]; // Assuming username is unique identifier in user_plans
+        $update_result = $wpdb->update($table_name, $plan_update_data, $where, $plan_update_formats, ['%d']);
         if ($update_result === false) {
             error_log('MySQL Update Error (user_plans): ' . $wpdb->last_error);
             return new WP_REST_Response([
