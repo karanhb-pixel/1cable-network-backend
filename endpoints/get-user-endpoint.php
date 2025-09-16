@@ -30,7 +30,7 @@ function get_user_plan($request)
     $user_plans_table = 'user_plans';
     $wifi_plans_table = $wpdb->prefix . 'wifi_plans';
     $ott_plans_table = $wpdb->prefix . 'ott_plans';
-
+    
     if (!$user_id) {
         return new WP_REST_Response(data: ['error' => 'Authentication failed'], status: 401);
     }
@@ -82,6 +82,8 @@ function get_user_plan($request)
         $results_user_email = $results[0]['email'];
         //getting user details from wp_users table
         $user = get_user_by('email', $results_user_email);
+
+
 
         if ($user) {
             $user_details = [
