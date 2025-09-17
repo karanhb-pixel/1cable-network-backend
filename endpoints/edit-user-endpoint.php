@@ -5,14 +5,6 @@ register_rest_route('wp/v2/iws/v1', 'users', [
     'callback' => 'handle_edit_user',
     'permission_callback' => 'check_edit_user_permission',
     'args' => [
-        'plan_id' => [
-            'description' => 'Plan ID to filter results.',
-            'type' => 'integer',
-            'required' => false,
-            'validate_callback' => function ($value) {
-                return is_numeric($value) && $value > 0;
-            },
-        ],
         'user_id' => [
             'description' => 'User ID to filter results.',
             'type' => 'integer',
@@ -112,105 +104,92 @@ register_rest_route('wp/v2/iws/v1', 'users', [
 function check_edit_user_permission() {
     return current_user_can('edit_users');
 }
-
-// Callback function
 function handle_edit_user($request) {
+    $user_id_from_url = intval($request->get_param('id'));
     $params = $request->get_json_params();
-    $plan_id = $request->get_param('plan_id');
-    $user_id = isset($params['user_id']) ? sanitize_user($params['user_id']) : '';
-    global $wpdb;
-    $table_name = 'user_plans';
 
-    // error_log('handle_edit_user called with user_id: ' . $plan_id . ' and user_login: ' . $user_id);
-    // Validate user exists
-    $user = get_user_by('ID', $user_id);
-    if (!$user) {
+    $user_to_update = get_user_by('ID', $user_id_from_url);
+    if (!$user_to_update) {
         return new WP_REST_Response(['error' => 'User not found.'], 404);
     }
-
-    // Prepare update data for user
-    $user_update_data = [];
-    if (isset($params['username']) && !empty($params['username'])) {
-        $user_update_data['user_login'] = $params['username'];
+    error_log('User to update: ' . print_r($user_to_update, true));
+    // --- Step 1: Collect standard user data for comparison ---
+    $user_update_data = ['ID' => $user_to_update->ID];
+    
+    if (isset($params['username']) && $params['username'] !== $user_to_update->user_login) {
+        $user_update_data['user_login'] = sanitize_user($params['username']);
     }
-    if (isset($params['name']) && !empty($params['name'])) {
-        $user_update_data['display_name'] = $params['name'];
+    if (isset($params['name']) && $params['name'] !== $user_to_update->display_name) {
+        $user_update_data['display_name'] = sanitize_text_field($params['name']);
     }
-    if (isset($params['first_name'])) {
-        $user_update_data['first_name'] = $params['first_name'];
+    if (isset($params['first_name']) && $params['first_name'] !== $user_to_update->first_name) {
+        $user_update_data['first_name'] = sanitize_text_field($params['first_name']);
     }
-    if (isset($params['last_name'])) {
-        $user_update_data['last_name'] = $params['last_name'];
+    if (isset($params['last_name']) && $params['last_name'] !== $user_to_update->last_name) {
+        $user_update_data['last_name'] = sanitize_text_field($params['last_name']);
     }
-    if (isset($params['email']) && !empty($params['email'])) {
-        $user_update_data['user_email'] = $params['email'];
+    if (isset($params['email']) && $params['email'] !== $user_to_update->user_email) {
+        $user_update_data['user_email'] = sanitize_email($params['email']);
     }
-    if (isset($params['nicename'])) {
-        $user_update_data['nicename'] = $params['nicename'];
+    if (isset($params['nicename']) && $params['nicename'] !== $user_to_update->user_nicename) {
+        $user_update_data['user_nicename'] = sanitize_text_field($params['nicename']);
     }
-    if (isset($params['roles']) && !empty($params['roles'])) {
-        $user_update_data['role'] = $params['roles'];
+    if (isset($params['roles']) && !in_array($params['roles'], $user_to_update->roles)) {
+        $user_update_data['role'] = sanitize_text_field($params['roles']);
     }
     if (isset($params['password']) && !empty($params['password'])) {
         $user_update_data['user_pass'] = $params['password'];
     }
-    $user_update_data['ID'] = $user->ID;
 
-    // error_log('uesr_update_data in edit user enddpoint'. print_r($user_update_data, true));
-    // Update the user
-    if (!empty($user_update_data)) {
-        $update_result = wp_update_user($user_update_data);
-        if (is_wp_error($update_result)) {
-            return new WP_REST_Response(['error' => $update_result->get_error_message()], 400);
-        }
-    }
+    // --- Step 2: Collect meta_input for comparison ---
+    $meta_input = [];
+    $current_meta = get_all_custom_user_meta($user_to_update->ID);
 
-    // Prepare update data for user_plans
-    $plan_update_data = [];
-    $plan_update_formats = [];
-    if (isset($params['wifi_plan'])) {
-        $plan_update_data['wifi_plan'] = (empty($params['wifi_plan']) || trim($params['wifi_plan']) === '0') ? 0 : $params['wifi_plan'];
-        $plan_update_formats[] = '%d';
+    if (isset($params['wifi_plan']) && sanitize_text_field($params['wifi_plan']) !== $current_meta['wifi_plan']) {
+        $meta_input['wifi_plan'] = (empty($params['wifi_plan']) || trim($params['wifi_plan']) === '0') ? 0 : sanitize_text_field($params['wifi_plan']);
     }
-    if (isset($params['ott_plan'])) {
-        $plan_update_data['ott_plan'] = (empty($params['ott_plan']) || trim($params['ott_plan']) === '0') ? 0 : $params['ott_plan'];
-        $plan_update_formats[] = '%d';
+    if (isset($params['ott_plan']) && sanitize_text_field($params['ott_plan']) !== $current_meta['ott_plan']) {
+        $meta_input['ott_plan'] = (empty($params['ott_plan']) || trim($params['ott_plan']) === '0') ? 0 : sanitize_text_field($params['ott_plan']);
     }
-    if (isset($params['start_date'])) {
-        $plan_update_data['start_date'] = !empty($params['start_date']) ? $params['start_date'] : null;
-        $plan_update_formats[] = '%s';
+    if (isset($params['start_date']) && sanitize_text_field($params['start_date']) !== $current_meta['start_date']) {
+        $meta_input['start_date'] = !empty($params['start_date']) ? sanitize_text_field($params['start_date']) : null;
     }
-    if (isset($params['end_date'])) {
-        $plan_update_data['end_date'] = !empty($params['end_date']) ? $params['end_date'] : null;
-        $plan_update_formats[] = '%s';
+    if (isset($params['end_date']) && sanitize_text_field($params['end_date']) !== $current_meta['end_date']) {
+        $meta_input['end_date'] = !empty($params['end_date']) ? sanitize_text_field($params['end_date']) : null;
     }
-    if (isset($params['username']) && !empty($params['username'])) {
-        $plan_update_data['username'] = $params['username'];
-        $plan_update_formats[] = '%s';
-    }
-    if (isset($params['email']) && !empty($params['email'])) {
-        $plan_update_data['email'] = $params['email'];
-        $plan_update_formats[] = '%s';
+    
+    // Add meta_input to the user data array
+    if (!empty($meta_input)) {
+        $user_update_data['meta_input'] = $meta_input;
     }
 
-    // Update user_plans table
-    if (!empty($plan_update_data)) {
-        $where = ['plan_id' => $plan_id]; // Assuming username is unique identifier in user_plans
-        $update_result = $wpdb->update($table_name, $plan_update_data, $where, $plan_update_formats, ['%d']);
-        if ($update_result === false) {
-            error_log('MySQL Update Error (user_plans): ' . $wpdb->last_error);
-            return new WP_REST_Response([
-                'success' => false,
-                'message' => 'Failed to update plan data.',
-                'db_error' => $wpdb->last_error
-            ], 500);
-        }
+    // --- Step 3: Perform the update only if there's something to change ---
+    // Remove the 'ID' key for the check, as it will always be set.
+    $check_for_changes = $user_update_data;
+    unset($check_for_changes['ID']);
+
+    error_log('check_for_changes'. print_r($check_for_changes, true));
+
+    if (empty($check_for_changes)) {
+        return new WP_REST_Response([
+            'success' => true,
+            'user_id' => $user_id_from_url,
+            'message' => 'No changes detected. Update not performed.'
+        ], 200);
+    }
+    
+    $update_result = wp_update_user($user_update_data);
+
+    if (is_wp_error($update_result)) {
+        return new WP_REST_Response([
+            'error' => $update_result->get_error_message()
+        ], 400);
     }
 
-    // Return success response
+    // --- Step 4: Return success response ---
     return new WP_REST_Response([
         'success' => true,
-        'user_id' => $user_id,
+        'user_id' => $user_id_from_url,
         'message' => 'User updated successfully.'
     ], 200);
 }

@@ -5,8 +5,8 @@ register_rest_route('wp/v2/iws/v1', 'users', [
     'callback' => 'get_user_plan',
     'permission_callback' => 'check_user_permission',
     'args' => [
-        'plan_id' => [
-            'description' => 'Plan ID to filter results.',
+        'user_id' => [ // Changed from plan_id to user_id for better logic
+            'description' => 'User ID to filter results.',
             'type' => 'integer',
             'required' => false,
             'validate_callback' => function ($value) {
@@ -16,94 +16,83 @@ register_rest_route('wp/v2/iws/v1', 'users', [
     ]
 ]);
 
-// Callback function
+
+
+/**
+ * Callback function to get user plan data from user meta.
+ *
+ * @param WP_REST_Request $request
+ * @return WP_REST_Response|WP_Error
+ */
 function get_user_plan($request)
 {
-    // (Paste the get_user_plans function code here)
-    $current_user = wp_get_current_user();
-    $user_roles = $current_user->roles;
-    $user_id = $current_user->ID;
-    $user_email = $current_user->user_email;
-    $plan_id = $request->get_param('plan_id');
-
     global $wpdb;
-    $user_plans_table = 'user_plans';
+    $current_user = wp_get_current_user();
     $wifi_plans_table = $wpdb->prefix . 'wifi_plans';
     $ott_plans_table = $wpdb->prefix . 'ott_plans';
-    
-    if (!$user_id) {
-        return new WP_REST_Response(data: ['error' => 'Authentication failed'], status: 401);
-    }
-
     $results = [];
 
-    if (in_array('administrator', $user_roles)) {
-        if ($plan_id) {
-            $sql_query = $wpdb->prepare(
-                "SELECT up.plan_id, up.username, up.start_date, up.end_date, up.email, wp.speed AS wifi_speed, ot.duration AS ott_duration 
-                 FROM {$user_plans_table} AS up 
-                 LEFT JOIN {$wifi_plans_table} AS wp ON up.wifi_plan = wp.plan_id 
-                 LEFT JOIN {$ott_plans_table} AS ot ON up.ott_plan = ot.plan_id 
-                 WHERE up.plan_id = %d",
-                $plan_id
-            );
-
-
-
-        } else {
-            // Case 2: Admin requests all user details (no email parameter).
-            $sql_query = "SELECT up.plan_id, up.username, up.start_date, up.end_date, up.email, wp.speed AS wifi_speed, ot.duration AS ott_duration 
-                          FROM {$user_plans_table} AS up 
-                          LEFT JOIN {$wifi_plans_table} AS wp ON up.wifi_plan = wp.plan_id 
-                          LEFT JOIN {$ott_plans_table} AS ot ON up.ott_plan = ot.plan_id";
-        }
-
-    } else {
-        // Case 3: Subscriber requests only their own details.
-        // We ignore any 'user_email' parameter for security.
-        $sql_query = $wpdb->prepare(
-            "SELECT up.plan_id, up.username, up.start_date, up.end_date, up.email, wp.speed AS wifi_speed, ot.duration AS ott_duration 
-             FROM {$user_plans_table} AS up 
-             LEFT JOIN {$wifi_plans_table} AS wp ON up.wifi_plan = wp.plan_id 
-             LEFT JOIN {$ott_plans_table} AS ot ON up.ott_plan = ot.plan_id 
-             WHERE up.email = %s",
-            $user_email
-        );
+    if (!$current_user->ID) {
+        return new WP_REST_Response(['error' => 'Authentication failed'], 401);
     }
 
-    // Execute the appropriate query.
-    $results = $wpdb->get_results($sql_query, ARRAY_A);
+    $user_id_from_request = $request->get_param('user_id');
+    $args = [];
+
+    if (in_array('administrator', $current_user->roles)) {
+        // Administrator can request a specific user or all users
+        if ($user_id_from_request) {
+            $args['include'] = [$user_id_from_request];
+        }
+    } else {
+        // Subscriber can only request their own details
+        $args['include'] = [$current_user->ID];
+    }
+
+    // Fetch users based on the arguments
+    $users = get_users($args);
+
+    if (empty($users)) {
+        return new WP_REST_Response(['message' => 'No users found.'], 404);
+    }
+
+    // Process each user to get their plan details
+    foreach ($users as $user) {
+        // Get user meta fields
+        $wifi_plan_id = get_user_meta($user->ID, 'wifi_plan', true);
+        $ott_plan_id = get_user_meta($user->ID, 'ott_plan', true);
+
+        $plan_details = [
+            'user_id' => $user->ID,
+            'username' => $user->user_login,
+            'email' => $user->user_email,
+            'display_name' => $user->display_name,
+            'nicename' => $user->nicename,
+            'roles' => $user->roles[0],
+            'first_name' => get_user_meta($user->ID, 'first_name', true),
+            'last_name' => get_user_meta($user->ID, 'last_name', true),
+            'start_date' => get_user_meta($user->ID, 'start_date', true),
+            'end_date' => get_user_meta($user->ID, 'end_date', true),
+        ];
+
+        // Join with wifi_plans table
+        if ($wifi_plan_id) {
+            $wifi_plan = $wpdb->get_row($wpdb->prepare("SELECT speed FROM {$wifi_plans_table} WHERE plan_id = %d", $wifi_plan_id), ARRAY_A);
+            $plan_details['wifi_speed'] = $wifi_plan['speed'] ?? null;
+        }
+
+        // Join with ott_plans table
+        if ($ott_plan_id) {
+            $ott_plan = $wpdb->get_row($wpdb->prepare("SELECT duration FROM {$ott_plans_table} WHERE plan_id = %d", $ott_plan_id), ARRAY_A);
+            $plan_details['ott_duration'] = $ott_plan['duration'] ?? null;
+        }
+
+        $results[] = $plan_details;
+    }
 
     if (empty($results)) {
-        return new WP_REST_Response(['message' => 'No plans found for this user'], 404);
+        return new WP_REST_Response(['message' => 'No plans found for this user.'], 404);
     }
-
-    if ($plan_id && in_array('administrator', $user_roles)) {
-        $results_user_email = $results[0]['email'];
-        //getting user details from wp_users table
-        $user = get_user_by('email', $results_user_email);
-
-
-
-        if ($user) {
-            $user_details = [
-                'user_id' => $user->ID,
-                'name' => $user->display_name,
-                'first_name' => $user->first_name,
-                'last_name' => $user->last_name,
-                'nicename' => $user->user_nicename,
-                'display_name' => $user->display_name,
-                'roles' => $user->roles[0],
-            ];
-            // Merge the user details into the first (and only) result.
-            $results[0] = array_merge($results[0], $user_details);
-
-        } else {
-            return new WP_REST_Response(['error' => 'User details not found in wp'], 404);
-        }
-
-    }
-
+    // error_log('result in get_user : '. json_encode($results));
     return new WP_REST_Response($results, 200);
 }
-
