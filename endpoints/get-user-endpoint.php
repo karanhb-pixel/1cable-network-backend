@@ -44,6 +44,7 @@ function get_user_plan($request)
         if ($user_id_from_request) {
             $args['include'] = [$user_id_from_request];
         }
+        $args['role__not_in'] = ['administrator']; // Exclude administrators from the list
     } else {
         // Subscriber can only request their own details
         $args['include'] = [$current_user->ID];
@@ -94,5 +95,9 @@ function get_user_plan($request)
         return new WP_REST_Response(['message' => 'No plans found for this user.'], 404);
     }
     // error_log('result in get_user : '. json_encode($results));
+    foreach ($results as $result) {
+
+    }
+
     return new WP_REST_Response($results, 200);
 }
