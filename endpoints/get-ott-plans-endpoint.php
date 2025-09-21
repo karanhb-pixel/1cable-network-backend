@@ -69,7 +69,9 @@
 // Callback function
 function get_ott_plans($request) {
     global $wpdb;
-        $results = $wpdb->get_results("SELECT * FROM wp_ott_plans", ARRAY_A);
+    $table_prefix = $wpdb->prefix;
+    $table_name = $table_prefix.'ott_plans';
+        $results = $wpdb->get_results("SELECT * FROM {$table_name}", ARRAY_A);
     if (empty($results)) {
         return new WP_REST_Response(['message' => 'No plans found for ott'], 404);
     }
@@ -80,7 +82,8 @@ function get_ott_plans($request) {
 // POST callback function: adds a new ott plan
 function handle_add_ott_plan($request) {
     global $wpdb;
-    $table_name = 'wp_ott_plans';
+    $table_name = $wpdb->prefix.'ott_plans';
+   
 
     $params = $request->get_json_params();
 
@@ -109,7 +112,7 @@ function handle_add_ott_plan($request) {
 // PUT callback function: edits an existing ott plan
 function handle_edit_ott_plan($request) {
     global $wpdb;
-    $table_name = 'wp_ott_plans';
+    $table_name = $wpdb->prefix.'ott_plans';
 
     $params = $request->get_json_params();
     $plan_id = $params['plan_id'];

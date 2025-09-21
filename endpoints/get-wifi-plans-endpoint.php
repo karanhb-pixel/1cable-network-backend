@@ -81,7 +81,9 @@
 // Callback function
 function get_wifi_plans($request) {
     global $wpdb;
-        $results = $wpdb->get_results("SELECT * FROM wp_wifi_plans", ARRAY_A);
+    $table_prefix = $wpdb->prefix;
+    $table_name = $table_prefix.'wifi_plans';
+        $results = $wpdb->get_results("SELECT * FROM {$table_name}", ARRAY_A);
     if (empty($results)) {
         return new WP_REST_Response(['message' => 'No plans found for wifi'], 404);
     }
@@ -93,7 +95,8 @@ function get_wifi_plans($request) {
 // POST callback function: adds a new wifi plan
 function handle_add_wifi_plan($request) {
     global $wpdb;
-    $table_name = 'wp_wifi_plans';
+    $table_prefix = $wpdb->prefix;
+    $table_name = $table_prefix.'wifi_plans';
 
     $params = $request->get_params();
 
@@ -123,7 +126,8 @@ function handle_add_wifi_plan($request) {
 // PUT callback function: edits an existing wifi plan
 function handle_edit_wifi_plan($request) {
     global $wpdb;
-    $table_name = 'wp_wifi_plans';
+    $table_prefix = $wpdb->prefix;
+    $table_name = $table_prefix.'wifi_plans';
 
     $params = $request->get_params();
     $plan_id = $params['plan_id'];
